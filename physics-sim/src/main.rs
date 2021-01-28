@@ -4,6 +4,8 @@
     windows_subsystem = "windows"
 )]
 
+mod engine;
+
 use anyhow::{bail, Context, Result};
 use log::{debug, error, info, trace, warn};
 
@@ -36,7 +38,56 @@ fn init_logger() -> Result<()> {
 fn main() -> Result<()> {
     init_logger()?;
 
-    println!("Hello, world!");
+    info!(env!("CARGO_PKG_VERSION"));
+    info!("initializing");
+
+    let event_loop = winit::event_loop::EventLoop::new();
+    let mut window = winit::window::WindowBuilder::new()
+        .with_inner_size(winit::dpi::LogicalSize::new(800, 600))
+        .with_title("Box of Chocolates")
+        .with_resizable(true)
+        .with_transparent(false)
+        .build(&event_loop)?;
+
+    let mut engine = futures::executor::block_on(engine::Engine::new(&window));
+
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = winit::event_loop::ControlFlow::Poll;
+        engine.input(&event);
+        match event {
+            winit::event::Event::NewEvents(_) => {}
+            winit::event::Event::WindowEvent { window_id, event } => match event {
+                winit::event::WindowEvent::CloseRequested => {
+                    *control_flow = winit::event_loop::ControlFlow::Exit;
+                }
+                winit::event::WindowEvent::KeyboardInput {
+                    device_id,
+                    input,
+                    is_synthetic,
+                } => match input {
+                    winit::event::KeyboardInput {
+                        virtual_keycode: Some(winit::event::VirtualKeyCode::Escape),
+                        state: winit::event::ElementState::Pressed,
+                        ..
+                    } => {
+                        *control_flow = winit::event_loop::ControlFlow::Exit;
+                    }
+                    _ => {}
+                },
+                _ => {}
+            },
+            winit::event::Event::MainEventsCleared => {
+                window.request_redraw();
+            }
+            winit::event::Event::RedrawRequested(_) => {
+                engine.update();
+                engine.render();
+            }
+            winit::event::Event::RedrawEventsCleared => {}
+            winit::event::Event::LoopDestroyed => {}
+            _ => {}
+        }
+    });
 
     Ok(())
 }
