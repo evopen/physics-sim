@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "physics-sim"
+]
+
+exclude = [
+    "rust-gpu"
+]
