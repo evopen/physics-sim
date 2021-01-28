@@ -6,7 +6,10 @@
 
 mod engine;
 
+use std::pin::Pin;
+
 use anyhow::{bail, Context, Result};
+use engine::Engine;
 use log::{debug, error, info, trace, warn};
 
 fn init_logger() -> Result<()> {
@@ -49,7 +52,7 @@ fn main() -> Result<()> {
         .with_transparent(false)
         .build(&event_loop)?;
 
-    let mut engine = futures::executor::block_on(engine::Engine::new(&window));
+    let mut engine = futures::executor::block_on(engine::Engine::new(&window))?;
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = winit::event_loop::ControlFlow::Poll;

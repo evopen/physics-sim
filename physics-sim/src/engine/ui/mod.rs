@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{pin::Pin, ptr::NonNull, time::Instant};
 
 use anyhow::Result;
 pub use egui_winit_platform::PlatformDescriptor;
@@ -15,6 +15,7 @@ pub struct Ui {
     time: Instant,
     tx: std::sync::mpsc::Sender<Message>,
     pub paint_jobs: egui::PaintJobs,
+    device: NonNull<wgpu::Device>,
 }
 
 impl Ui {
@@ -31,6 +32,8 @@ impl Ui {
 
         let paint_jobs = vec![];
 
+        let a = NonNull::from(device);
+
         (
             Self {
                 render_pass,
@@ -38,6 +41,7 @@ impl Ui {
                 time,
                 tx,
                 paint_jobs,
+                device: NonNull::from(device),
             },
             rx,
         )

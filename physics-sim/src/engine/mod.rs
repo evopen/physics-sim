@@ -1,3 +1,6 @@
+use std::pin::Pin;
+
+use anyhow::{Context, Result};
 use egui::FontDefinitions;
 use futures::channel::mpsc::Receiver;
 use wgpu::util::DeviceExt;
@@ -19,7 +22,7 @@ pub struct Engine {
 }
 
 impl Engine {
-    pub async fn new(window: &winit::window::Window) -> Self {
+    pub async fn new(window: &winit::window::Window) -> Result<Pin<Box<Self>>> {
         let window_size = window.inner_size();
         let scale_factor = window.scale_factor();
         let size = window.inner_size();
@@ -31,7 +34,7 @@ impl Engine {
                 compatible_surface: Some(&surface),
             })
             .await
-            .unwrap();
+            .context("failed to request adapter")?;
 
         let (device, queue) = adapter
             .request_device(
@@ -42,8 +45,7 @@ impl Engine {
                 },
                 None,
             )
-            .await
-            .unwrap();
+            .await?;
 
         let swap_chain_desc = wgpu::SwapChainDescriptor {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
@@ -112,7 +114,7 @@ impl Engine {
             },
         );
 
-        Self {
+        Ok(Box::pin(Self {
             window_size,
             scale_factor,
             swap_chain,
@@ -123,7 +125,7 @@ impl Engine {
             bind_group,
             ui,
             ui_messenger,
-        }
+        }))
     }
 
     pub fn input<T>(&mut self, winit_event: &winit::event::Event<T>) {
