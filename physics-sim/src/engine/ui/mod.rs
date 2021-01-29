@@ -20,19 +20,17 @@ pub struct Ui {
 
 impl Ui {
     pub fn new(
-        device: &wgpu::Device,
+        device: Pin<&wgpu::Device>,
         platform_descriptor: PlatformDescriptor,
     ) -> (Self, std::sync::mpsc::Receiver<Message>) {
         let render_pass =
-            egui_wgpu_backend::RenderPass::new(device, wgpu::TextureFormat::Bgra8UnormSrgb);
+            egui_wgpu_backend::RenderPass::new(&device, wgpu::TextureFormat::Bgra8UnormSrgb);
         let platform = egui_winit_platform::Platform::new(platform_descriptor);
         let time = Instant::now();
 
         let (tx, rx) = std::sync::mpsc::channel();
 
         let paint_jobs = vec![];
-
-        let a = NonNull::from(device);
 
         (
             Self {
@@ -41,7 +39,7 @@ impl Ui {
                 time,
                 tx,
                 paint_jobs,
-                device: NonNull::from(device),
+                device: NonNull::from(&*device),
             },
             rx,
         )
@@ -50,7 +48,6 @@ impl Ui {
     pub fn update<T>(
         &mut self,
         winit_event: &winit::event::Event<T>,
-        device: &wgpu::Device,
         queue: &wgpu::Queue,
         size: &winit::dpi::PhysicalSize<u32>,
         scale_factor: f64,
@@ -61,8 +58,10 @@ impl Ui {
 
         self.draw_ui();
 
+        let device = unsafe { self.device.as_ref() };
+
         self.render_pass
-            .update_texture(&device, &queue, &self.ui_instance.context().texture());
+            .update_texture(device, &queue, &self.ui_instance.context().texture());
         self.render_pass.update_buffers(
             device,
             queue,

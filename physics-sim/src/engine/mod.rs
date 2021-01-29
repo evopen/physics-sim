@@ -13,7 +13,7 @@ pub struct Engine {
     scale_factor: f64,
     swap_chain: wgpu::SwapChain,
     rt: tokio::runtime::Runtime,
-    device: wgpu::Device,
+    device: Pin<Box<wgpu::Device>>,
     queue: wgpu::Queue,
     debug_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
@@ -46,6 +46,7 @@ impl Engine {
                 None,
             )
             .await?;
+        let device = Box::pin(device);
 
         let swap_chain_desc = wgpu::SwapChainDescriptor {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
@@ -102,7 +103,7 @@ impl Engine {
             egui_wgpu_backend::RenderPass::new(&device, wgpu::TextureFormat::Bgra8UnormSrgb);
 
         let (ui, ui_messenger) = Ui::new(
-            &device,
+            device.as_ref(),
             ui::PlatformDescriptor {
                 physical_width: size.width,
                 physical_height: size.height,
@@ -131,7 +132,6 @@ impl Engine {
     pub fn input<T>(&mut self, winit_event: &winit::event::Event<T>) {
         self.ui.update(
             winit_event,
-            &self.device,
             &self.queue,
             &self.window_size,
             self.scale_factor,
