@@ -1,8 +1,7 @@
-use std::pin::Pin;
-
 use anyhow::{Context, Result};
 use egui::FontDefinitions;
 use futures::channel::mpsc::Receiver;
+use std::collections::BTreeMap;
 use wgpu::util::DeviceExt;
 
 mod ui;
@@ -13,16 +12,17 @@ pub struct Engine {
     scale_factor: f64,
     swap_chain: wgpu::SwapChain,
     rt: tokio::runtime::Runtime,
-    device: Pin<Box<wgpu::Device>>,
+    device: wgpu::Device,
     queue: wgpu::Queue,
     debug_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     ui: Ui,
     ui_messenger: std::sync::mpsc::Receiver<ui::Message>,
+    models: BTreeMap<String, gltf::Gltf>,
 }
 
 impl Engine {
-    pub async fn new(window: &winit::window::Window) -> Result<Pin<Box<Self>>> {
+    pub async fn new(window: &winit::window::Window) -> Result<Self> {
         let window_size = window.inner_size();
         let scale_factor = window.scale_factor();
         let size = window.inner_size();
@@ -46,7 +46,6 @@ impl Engine {
                 None,
             )
             .await?;
-        let device = Box::pin(device);
 
         let swap_chain_desc = wgpu::SwapChainDescriptor {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
@@ -103,7 +102,7 @@ impl Engine {
             egui_wgpu_backend::RenderPass::new(&device, wgpu::TextureFormat::Bgra8UnormSrgb);
 
         let (ui, ui_messenger) = Ui::new(
-            device.as_ref(),
+            &device,
             ui::PlatformDescriptor {
                 physical_width: size.width,
                 physical_height: size.height,
@@ -115,7 +114,7 @@ impl Engine {
             },
         );
 
-        Ok(Box::pin(Self {
+        Ok(Self {
             window_size,
             scale_factor,
             swap_chain,
@@ -126,19 +125,44 @@ impl Engine {
             bind_group,
             ui,
             ui_messenger,
-        }))
+            models: BTreeMap::new(),
+        })
     }
 
     pub fn input<T>(&mut self, winit_event: &winit::event::Event<T>) {
         self.ui.update(
             winit_event,
+            &self.device,
             &self.queue,
             &self.window_size,
             self.scale_factor,
         );
     }
 
-    pub fn update(&mut self) {}
+    pub fn update(&mut self) -> Result<()> {
+        if let Ok(msg) = self.ui_messenger.try_recv() {
+            match msg {
+                ui::Message::Open => match nfd2::open_file_dialog(None, None) {
+                    Ok(response) => match response {
+                        nfd2::Response::Okay(p) => {
+                            self.models.insert(
+                                p.file_stem()
+                                    .context("no file stem")?
+                                    .to_str()
+                                    .context("not unicode")?
+                                    .to_string(),
+                                gltf::Gltf::open(p)?,
+                            );
+                        }
+                        nfd2::Response::OkayMultiple(_) => {}
+                        nfd2::Response::Cancel => {}
+                    },
+                    Err(_) => {}
+                },
+            }
+        }
+        Ok(())
+    }
 
     pub fn render(&mut self) {
         let frame = self.swap_chain.get_current_frame().unwrap().output;

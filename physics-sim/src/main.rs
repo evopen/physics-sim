@@ -1,4 +1,4 @@
-#![cfg_attr(debug_assertions, allow(dead_code, unused_imports))]
+#![cfg_attr(debug_assertions, allow(dead_code, unused_imports, unused))]
 #![cfg_attr(
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
@@ -83,7 +83,7 @@ fn main() -> Result<()> {
                 window.request_redraw();
             }
             winit::event::Event::RedrawRequested(_) => {
-                engine.update();
+                engine.update().unwrap();
                 engine.render();
             }
             winit::event::Event::RedrawEventsCleared => {}

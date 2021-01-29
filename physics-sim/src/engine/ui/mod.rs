@@ -1,4 +1,4 @@
-use std::{pin::Pin, ptr::NonNull, time::Instant};
+use std::time::Instant;
 
 use anyhow::Result;
 pub use egui_winit_platform::PlatformDescriptor;
@@ -15,12 +15,11 @@ pub struct Ui {
     time: Instant,
     tx: std::sync::mpsc::Sender<Message>,
     pub paint_jobs: egui::PaintJobs,
-    device: NonNull<wgpu::Device>,
 }
 
 impl Ui {
     pub fn new(
-        device: Pin<&wgpu::Device>,
+        device: &wgpu::Device,
         platform_descriptor: PlatformDescriptor,
     ) -> (Self, std::sync::mpsc::Receiver<Message>) {
         let render_pass =
@@ -39,7 +38,6 @@ impl Ui {
                 time,
                 tx,
                 paint_jobs,
-                device: NonNull::from(&*device),
             },
             rx,
         )
@@ -48,6 +46,7 @@ impl Ui {
     pub fn update<T>(
         &mut self,
         winit_event: &winit::event::Event<T>,
+        device: &wgpu::Device,
         queue: &wgpu::Queue,
         size: &winit::dpi::PhysicalSize<u32>,
         scale_factor: f64,
@@ -57,8 +56,6 @@ impl Ui {
         self.ui_instance.handle_event(winit_event);
 
         self.draw_ui();
-
-        let device = unsafe { self.device.as_ref() };
 
         self.render_pass
             .update_texture(device, &queue, &self.ui_instance.context().texture());
